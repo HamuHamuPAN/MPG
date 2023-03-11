@@ -31,6 +31,9 @@ typedef enum
 	SOCD_MODE_UP_PRIORITY,           // U+D=U, L+R=N
 	SOCD_MODE_NEUTRAL,               // U+D=N, L+R=N
 	SOCD_MODE_SECOND_INPUT_PRIORITY, // U>D=D, L>R=R (Last Input Priority, aka Last Win)
+	FOUR_MODE_Y_PRIORITY,            // 4WAY Joystick MODE U+R=U, D+L=D L+R=N U+D=N
+	FOUR_MODE_X_PRIORITY,            // 4WAY Joystick MODE U+R=R, D+L=L L+R=N U+D=N
+	FOUR_MODE_SECOND_INPUT_PRIORITY, // 4WAY Joystick MODE U>R=R, R>U=U L>D=D d>L=L
 } SOCDMode;
 
 // Enum for tracking last direction state of Second Input SOCD method

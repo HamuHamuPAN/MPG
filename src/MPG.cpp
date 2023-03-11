@@ -201,6 +201,9 @@ XInputReport *MPG::getXInputReport()
 GamepadHotkey MPG::hotkey()
 {
 	static GamepadHotkey lastAction = HOTKEY_NONE;
+	static uint32_t setTimeF2 = 0;
+
+	uint32_t nowTime = getMillis();
 
 	GamepadHotkey action = HOTKEY_NONE;
 	if (pressedF1())
@@ -238,28 +241,78 @@ GamepadHotkey MPG::hotkey()
 	}
 	else if (pressedF2())
 	{
-		switch (state.dpad & GAMEPAD_MASK_DPAD)
+		if((nowTime - setTimeF2) >= 750)
 		{
-			case GAMEPAD_MASK_DOWN:
-				action = HOTKEY_SOCD_NEUTRAL;
-				options.socdMode = SOCD_MODE_NEUTRAL;
-				state.dpad = 0;
-				state.buttons &= ~(f2Mask);
-				break;
+			switch (state.dpad & GAMEPAD_MASK_DPAD)
+			{
+				case GAMEPAD_MASK_DOWN:
+					switch(options.socdMode)
+					{
+						case SOCD_MODE_NEUTRAL:
+							action = HOTKEY_SOCD_NEUTRAL;
+					    	options.socdMode = FOUR_MODE_X_PRIORITY;
+							break;
+				
+						case FOUR_MODE_X_PRIORITY:
+							action = HOTKEY_SOCD_NEUTRAL;
+							options.socdMode = SOCD_MODE_NEUTRAL;
+							break;	
 
-			case GAMEPAD_MASK_UP:
-				action = HOTKEY_SOCD_UP_PRIORITY;
-				options.socdMode = SOCD_MODE_UP_PRIORITY;
-				state.dpad = 0;
-				state.buttons &= ~(f2Mask);
-				break;
+						default:
+							action = HOTKEY_SOCD_NEUTRAL;
+							options.socdMode = SOCD_MODE_NEUTRAL;
+							break;
+					}
+					setTimeF2 = nowTime;
+					state.dpad = 0;
+					state.buttons &= ~(f2Mask);
+					break;
 
-			case GAMEPAD_MASK_LEFT:
-				action = HOTKEY_SOCD_LAST_INPUT;
-				options.socdMode = SOCD_MODE_SECOND_INPUT_PRIORITY;
-				state.dpad = 0;
-				state.buttons &= ~(f2Mask);
-				break;
+				case GAMEPAD_MASK_UP:
+					switch(options.socdMode)
+					{
+						case SOCD_MODE_UP_PRIORITY:
+							action = HOTKEY_SOCD_UP_PRIORITY;
+					    	options.socdMode = FOUR_MODE_Y_PRIORITY;
+							break;
+			
+						case FOUR_MODE_Y_PRIORITY:
+							action = HOTKEY_SOCD_UP_PRIORITY;
+							options.socdMode = SOCD_MODE_UP_PRIORITY;
+							break;
+
+						default:
+							action = HOTKEY_SOCD_UP_PRIORITY;
+							options.socdMode = SOCD_MODE_UP_PRIORITY;
+							break;
+					}
+					setTimeF2 = nowTime;
+					state.dpad = 0;
+					state.buttons &= ~(f2Mask);
+					break;
+
+				case GAMEPAD_MASK_LEFT:
+					switch(options.socdMode)
+					{
+						case SOCD_MODE_SECOND_INPUT_PRIORITY:
+							action = HOTKEY_SOCD_LAST_INPUT;
+					    	options.socdMode = FOUR_MODE_SECOND_INPUT_PRIORITY;
+							break;
+				
+						case FOUR_MODE_SECOND_INPUT_PRIORITY:
+							action = HOTKEY_SOCD_LAST_INPUT;
+							options.socdMode = SOCD_MODE_SECOND_INPUT_PRIORITY;
+							break;
+
+						default:
+							action = HOTKEY_SOCD_LAST_INPUT;
+							options.socdMode = SOCD_MODE_SECOND_INPUT_PRIORITY;
+							break;
+					}
+					setTimeF2 = nowTime;
+					state.dpad = 0;
+					state.buttons &= ~(f2Mask);
+					break;
 
 			case GAMEPAD_MASK_RIGHT:
 				if (lastAction != HOTKEY_INVERT_Y_AXIS)
@@ -268,13 +321,13 @@ GamepadHotkey MPG::hotkey()
 				state.dpad = 0;
 				state.buttons &= ~(f2Mask);
 				break;
+			}
 		}
 	}
 
 	lastAction = action;
 	return action;
 }
-
 
 void MPG::process()
 {

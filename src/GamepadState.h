@@ -73,6 +73,11 @@
 #define GAMEPAD_JOYSTICK_MID 0x7FFF
 #define GAMEPAD_JOYSTICK_MAX 0xFFFF
 
+#define SOCD_INPUT_FLAG_UP     0
+#define SOCD_INPUT_FLAG_DOWN   1
+#define SOCD_INPUT_FLAG_LEFT   2
+#define SOCD_INPUT_FLAG_RIGHT  3
+
 const uint8_t dpadMasks[] =
 {
 	GAMEPAD_MASK_UP,
@@ -144,6 +149,74 @@ inline uint16_t dpadToAnalogY(uint8_t dpad)
 	}
 }
 
+inline uint8_t socdLastInputCheck(uint8_t dpad,int *directionSetTime)
+{
+	uint8_t newDpad = 0;
+	int maxvalue = 0;
+	int maxindex = 0;
+	int i;
+
+	if((dpad & GAMEPAD_MASK_DPAD) != 0)
+	{
+		for(i=0 ; i<=3 ; i++)
+		{
+			if(maxvalue < directionSetTime[i])
+			{
+				maxvalue = directionSetTime[i];
+				maxindex = i;
+			}
+		}
+		newDpad = GAMEPAD_MASK_UP << maxindex;
+	}
+	else
+	{
+		newDpad = 0;
+	}
+	return newDpad;
+}
+
+inline void socdInputSet(int setDirection,int *directionSetTime)
+{
+	int maxvalue = 0;
+	int maxindex = 0;
+	int i;
+
+		for(i=0 ; i<=3 ; i++)
+		{
+			if(maxvalue < directionSetTime[i])
+			{
+				maxvalue = directionSetTime[i];
+				maxindex = i;
+			}
+		}
+		if (maxvalue > 8)
+		{
+			if ((directionSetTime[SOCD_INPUT_FLAG_UP] != 1)   && (directionSetTime[SOCD_INPUT_FLAG_DOWN] != 1) &&
+			    (directionSetTime[SOCD_INPUT_FLAG_LEFT] != 1) && (directionSetTime[SOCD_INPUT_FLAG_RIGHT] != 1))
+			{
+				for(i=0 ; i<=3 ; i++)
+				{
+					directionSetTime[i] = directionSetTime[i] - 1;
+				}
+			}
+			else
+			{
+				for(i=0 ; i<=3 ; i++)
+				{
+					if(directionSetTime[i] > 5)
+					{
+						directionSetTime[i] = directionSetTime[i] - 1;
+					}
+				}
+			}
+			directionSetTime[setDirection] = maxvalue;
+		}
+		else
+		{
+			directionSetTime[setDirection] = maxvalue + 1;
+		}
+}
+
 /**
  * @brief Run SOCD cleaning against a D-pad value.
  *
@@ -155,60 +228,211 @@ inline uint8_t runSOCDCleaner(SOCDMode mode, uint8_t dpad)
 {
 	static DpadDirection lastUD = DIRECTION_NONE;
 	static DpadDirection lastLR = DIRECTION_NONE;
+	static uint8_t lastoutput = 0;
+	static uint8_t lastinput  = 0;
+	static int directionSetTime[4] = {0,0,0,0};
+
 	uint8_t newDpad = 0;
 
-	switch (dpad & (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN))
+
+	if (lastinput != (dpad & GAMEPAD_MASK_DPAD))
 	{
-		case (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN):
-			if (mode == SOCD_MODE_UP_PRIORITY)
+		/* 4WAY JOYSTICK MODE */
+		switch (mode)
+		{
+		case FOUR_MODE_SECOND_INPUT_PRIORITY: /* 4WAY LAST INPUT PRIORITY */
+			if ((lastinput & GAMEPAD_MASK_UP) != (dpad & GAMEPAD_MASK_UP))	/* UP Change? */
 			{
-				newDpad |= GAMEPAD_MASK_UP;
-				lastUD = DIRECTION_UP;
+				if((dpad & GAMEPAD_MASK_UP) == GAMEPAD_MASK_UP)  /* UP TURN ON */
+				{
+					newDpad = GAMEPAD_MASK_UP;
+					socdInputSet(SOCD_INPUT_FLAG_UP, directionSetTime);
+				}
+				else /* UP TURN OFF */
+				{
+					directionSetTime[SOCD_INPUT_FLAG_UP] = 0;
+					if((lastoutput & GAMEPAD_MASK_UP) == GAMEPAD_MASK_UP)
+					{
+						newDpad = socdLastInputCheck(dpad, directionSetTime);
+					}
+					else
+					{
+						newDpad = lastoutput;
+					}
+				}
 			}
-			else if (mode == SOCD_MODE_SECOND_INPUT_PRIORITY && lastUD != DIRECTION_NONE)
-				newDpad |= (lastUD == DIRECTION_UP) ? GAMEPAD_MASK_DOWN : GAMEPAD_MASK_UP;
-			else
-				lastUD = DIRECTION_NONE;
+
+			if ((lastinput & GAMEPAD_MASK_DOWN) != (dpad & GAMEPAD_MASK_DOWN))	/* DOWN Change? */
+			{
+				if((dpad & GAMEPAD_MASK_DOWN) == GAMEPAD_MASK_DOWN)
+				{
+					newDpad = GAMEPAD_MASK_DOWN;
+					socdInputSet(SOCD_INPUT_FLAG_DOWN, directionSetTime);
+				}
+				else
+				{
+					directionSetTime[SOCD_INPUT_FLAG_DOWN] = 0;
+					if((lastoutput & GAMEPAD_MASK_DOWN) == GAMEPAD_MASK_DOWN)
+					{
+						newDpad = socdLastInputCheck(dpad, directionSetTime);
+					}
+					else
+					{
+						newDpad = lastoutput;
+					}
+				}
+			}
+			if ((lastinput & GAMEPAD_MASK_LEFT) != (dpad & GAMEPAD_MASK_LEFT))	/* LEFT Change? */
+			{
+				if((dpad & GAMEPAD_MASK_LEFT) == GAMEPAD_MASK_LEFT)
+				{
+					newDpad = GAMEPAD_MASK_LEFT;
+					socdInputSet(SOCD_INPUT_FLAG_LEFT, directionSetTime);
+
+				}
+				else
+				{
+					directionSetTime[SOCD_INPUT_FLAG_LEFT] = 0;
+					if((lastoutput & GAMEPAD_MASK_LEFT) == GAMEPAD_MASK_LEFT)
+					{
+						newDpad = socdLastInputCheck(dpad, directionSetTime);
+					}
+					else
+					{
+						newDpad = lastoutput;
+					}
+				}
+			}
+
+			if ((lastinput & GAMEPAD_MASK_RIGHT) != (dpad & GAMEPAD_MASK_RIGHT))	/* RIGHT Change? */
+			{
+				if((dpad & GAMEPAD_MASK_RIGHT) == GAMEPAD_MASK_RIGHT)
+				{
+					newDpad = GAMEPAD_MASK_RIGHT;
+					socdInputSet(SOCD_INPUT_FLAG_RIGHT, directionSetTime);
+				}
+				else
+				{
+					directionSetTime[SOCD_INPUT_FLAG_RIGHT] = 0;
+					if((lastoutput & GAMEPAD_MASK_RIGHT) == GAMEPAD_MASK_RIGHT)
+					{
+						newDpad = socdLastInputCheck(dpad, directionSetTime);
+					}
+					else
+					{
+						newDpad = lastoutput;
+					}
+				}
+			}
+			break;
+		
+		case FOUR_MODE_Y_PRIORITY: /* 4WAY Y Priority */
+			switch (dpad & (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT))
+			{
+				case GAMEPAD_MASK_LEFT:
+					newDpad = GAMEPAD_MASK_LEFT;
+					break;
+
+				case GAMEPAD_MASK_RIGHT:
+					newDpad = GAMEPAD_MASK_RIGHT;
+					break;
+			}
+			switch (dpad & (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN))
+			{
+				case GAMEPAD_MASK_UP:
+					newDpad = GAMEPAD_MASK_UP;
+					break;
+
+				case GAMEPAD_MASK_DOWN:
+					newDpad = GAMEPAD_MASK_DOWN;
+					break;
+			}
 			break;
 
-		case GAMEPAD_MASK_UP:
-			newDpad |= GAMEPAD_MASK_UP;
-			lastUD = DIRECTION_UP;
+		case FOUR_MODE_X_PRIORITY: /* 4WAY X Priority */
+			switch (dpad & (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN))
+			{
+				case GAMEPAD_MASK_UP:
+					newDpad = GAMEPAD_MASK_UP;
+					break;
+
+				case GAMEPAD_MASK_DOWN:
+					newDpad = GAMEPAD_MASK_DOWN;
+					break;
+			}
+			switch (dpad & (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT))
+			{
+				case GAMEPAD_MASK_LEFT:
+					newDpad = GAMEPAD_MASK_LEFT;
+					break;
+
+				case GAMEPAD_MASK_RIGHT:
+					newDpad = GAMEPAD_MASK_RIGHT;
+					break;
+			}
 			break;
 
-		case GAMEPAD_MASK_DOWN:
-			newDpad |= GAMEPAD_MASK_DOWN;
-			lastUD = DIRECTION_DOWN;
-			break;
+		default: /* Normal SOCD MODE */
+			switch (dpad & (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN))
+			{
+				case (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN):
+					if (mode == SOCD_MODE_UP_PRIORITY)
+					{
+						newDpad |= GAMEPAD_MASK_UP;
+						lastUD = DIRECTION_UP;
+					}
+					else if (mode == SOCD_MODE_SECOND_INPUT_PRIORITY && lastUD != DIRECTION_NONE)
+						newDpad |= (lastUD == DIRECTION_UP) ? GAMEPAD_MASK_DOWN : GAMEPAD_MASK_UP;
+					else
+						lastUD = DIRECTION_NONE;
+					break;
 
-		default:
-			lastUD = DIRECTION_NONE;
+				case GAMEPAD_MASK_UP:
+					newDpad |= GAMEPAD_MASK_UP;
+					lastUD = DIRECTION_UP;
+					break;
+
+				case GAMEPAD_MASK_DOWN:
+					newDpad |= GAMEPAD_MASK_DOWN;
+					lastUD = DIRECTION_DOWN;
+					break;
+
+				default:
+					lastUD = DIRECTION_NONE;
+					break;
+			}
+			switch (dpad & (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT))
+			{
+				case (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT):
+					if (mode == SOCD_MODE_SECOND_INPUT_PRIORITY && lastLR != DIRECTION_NONE)
+						newDpad |= (lastLR == DIRECTION_LEFT) ? GAMEPAD_MASK_RIGHT : GAMEPAD_MASK_LEFT;
+					else
+						lastLR = DIRECTION_NONE;
+					break;
+
+				case GAMEPAD_MASK_LEFT:
+					newDpad |= GAMEPAD_MASK_LEFT;
+					lastLR = DIRECTION_LEFT;
+					break;
+
+				case GAMEPAD_MASK_RIGHT:
+					newDpad |= GAMEPAD_MASK_RIGHT;
+					lastLR = DIRECTION_RIGHT;
+					break;
+
+				default:
+					lastLR = DIRECTION_NONE;
+					break;
+			}
 			break;
+		}
 	}
-
-	switch (dpad & (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT))
+	else
 	{
-		case (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT):
-			if (mode == SOCD_MODE_SECOND_INPUT_PRIORITY && lastLR != DIRECTION_NONE)
-				newDpad |= (lastLR == DIRECTION_LEFT) ? GAMEPAD_MASK_RIGHT : GAMEPAD_MASK_LEFT;
-			else
-				lastLR = DIRECTION_NONE;
-			break;
-
-		case GAMEPAD_MASK_LEFT:
-			newDpad |= GAMEPAD_MASK_LEFT;
-			lastLR = DIRECTION_LEFT;
-			break;
-
-		case GAMEPAD_MASK_RIGHT:
-			newDpad |= GAMEPAD_MASK_RIGHT;
-			lastLR = DIRECTION_RIGHT;
-			break;
-
-		default:
-			lastLR = DIRECTION_NONE;
-			break;
+		newDpad = lastoutput;
 	}
 
+	lastinput  = (dpad & GAMEPAD_MASK_DPAD);
+	lastoutput = newDpad;
 	return newDpad;
 }
