@@ -201,9 +201,6 @@ XInputReport *MPG::getXInputReport()
 GamepadHotkey MPG::hotkey()
 {
 	static GamepadHotkey lastAction = HOTKEY_NONE;
-	static uint32_t setTimeF2 = 0;
-
-	uint32_t nowTime = getMillis();
 
 	GamepadHotkey action = HOTKEY_NONE;
 	if (pressedF1())
@@ -241,7 +238,7 @@ GamepadHotkey MPG::hotkey()
 	}
 	else if (pressedF2())
 	{
-		if((nowTime - setTimeF2) >= 750)
+		if(lastAction == HOTKEY_NONE)
 		{
 			switch (state.dpad & GAMEPAD_MASK_DPAD)
 			{
@@ -263,7 +260,6 @@ GamepadHotkey MPG::hotkey()
 							options.socdMode = SOCD_MODE_NEUTRAL;
 							break;
 					}
-					setTimeF2 = nowTime;
 					state.dpad = 0;
 					state.buttons &= ~(f2Mask);
 					break;
@@ -286,7 +282,6 @@ GamepadHotkey MPG::hotkey()
 							options.socdMode = SOCD_MODE_UP_PRIORITY;
 							break;
 					}
-					setTimeF2 = nowTime;
 					state.dpad = 0;
 					state.buttons &= ~(f2Mask);
 					break;
@@ -309,19 +304,31 @@ GamepadHotkey MPG::hotkey()
 							options.socdMode = SOCD_MODE_SECOND_INPUT_PRIORITY;
 							break;
 					}
-					setTimeF2 = nowTime;
 					state.dpad = 0;
 					state.buttons &= ~(f2Mask);
 					break;
 
-			case GAMEPAD_MASK_RIGHT:
-				if (lastAction != HOTKEY_INVERT_Y_AXIS)
-					options.invertYAxis = !options.invertYAxis;
-				action = HOTKEY_INVERT_Y_AXIS;
-				state.dpad = 0;
-				state.buttons &= ~(f2Mask);
-				break;
+				case GAMEPAD_MASK_RIGHT:
+					if (lastAction != HOTKEY_INVERT_Y_AXIS)
+						options.invertYAxis = !options.invertYAxis;
+					action = HOTKEY_INVERT_Y_AXIS;
+					state.dpad = 0;
+					state.buttons &= ~(f2Mask);
+					break;
 			}
+		}
+		else
+		{
+			if ((state.dpad & GAMEPAD_MASK_DPAD) == 0 )
+			{
+				action = HOTKEY_NONE;
+			}
+			else
+			{
+				action = HOTKEY_WAIT_F2;
+			}
+			state.dpad = 0;
+			state.buttons &= ~(f2Mask);
 		}
 	}
 

@@ -60,4 +60,6 @@ typedef enum
 	HOTKEY_SOCD_LAST_INPUT   = (1U << 7),
 	HOTKEY_INVERT_X_AXIS     = (1U << 8),
 	HOTKEY_INVERT_Y_AXIS     = (1U << 9),
+	HOTKEY_WAIT_F1           = (1U << 10),
+	HOTKEY_WAIT_F2           = (1U << 11),
 } GamepadHotkey;
